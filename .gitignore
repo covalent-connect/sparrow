@@ -102,3 +102,5 @@ sparrow-data/parse/sparrow_parse/images/rent improved.jpg
 sparrow-data/parse/sparrow_parse/images/bank_statement_1.jpg
 sparrow-data/parse/sparrow_parse/images/bank_statement_2.jpg
 sparrow-data/parse/sparrow_parse/images/bank_statement_3.jpg
+
+**/venv/*
