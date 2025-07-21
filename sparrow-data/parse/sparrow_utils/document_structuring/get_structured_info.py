@@ -7,6 +7,8 @@ init_django()
 
 from betterbrain.sql.models import *
 
+from utils.integrations.slack.send_message import send_slack_message
+
 # from django.conf import settings
 
 
@@ -43,7 +45,7 @@ def get_structured_info_from_file(
     factory = InferenceFactory(config)
     model_inference_instance = factory.get_inference_instance()
 
-    return {
+    final_dict = {
         'clause1': 'clause1',
         'clause2': 'clause2',
         'clause3': 'clause3',
@@ -52,6 +54,10 @@ def get_structured_info_from_file(
         'clause6': 'clause6',
         'clause7': 'clause7',
     }
+
+    send_slack_message(f"Final dict: {final_dict}")
+
+    return final_dict
 
     # # multi-page test
     # print("\n=== PDF PROCESSING ===")
@@ -71,3 +77,8 @@ def get_structured_info_from_file(
 
     # final_result = combine_json_results(pdf_results)
     # pprint.pprint(final_result)
+
+if __name__ == "__main__":
+    get_structured_info_from_file(4611)
+
+# python -m sparrow_utils.document_structuring.get_structured_info
