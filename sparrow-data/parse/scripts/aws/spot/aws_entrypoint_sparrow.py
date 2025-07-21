@@ -11,4 +11,4 @@ if __name__ == "__main__":
         send_slack_message(f"Traceback: {traceback.format_exc()}")
     
 
-# python -m sparrow_parse.testing.run_functions
+# python -m scripts.aws.spot.aws_entrypoint_sparrow
