@@ -104,3 +104,4 @@ sparrow-data/parse/sparrow_parse/images/bank_statement_2.jpg
 sparrow-data/parse/sparrow_parse/images/bank_statement_3.jpg
 
 **/venv/*
+**/*.log

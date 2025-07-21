@@ -1,11 +1,13 @@
 
-# from evaluation.eval_utils import init_django
+from settings import sparrow_settings as django_settings
+from settings import *
 
-# init_django()
+init_django()
+
+from betterbrain.sql.models import *
 
 # from django.conf import settings
 
-from settings import sparrow_settings as settings
 
 import json
 from sparrow_parse.vllm.inference_factory import InferenceFactory
@@ -26,7 +28,7 @@ config = {
     "model_name": "gpt-4o",
     "max_tokens": 4000,
     "temperature": 0.0,
-    "api_key": settings.OPENAI_API_KEY
+    "api_key": django_settings.OPENAI_API_KEY
 }
 
 # Create inference instance
@@ -72,7 +74,7 @@ model_inference_instance = factory.get_inference_instance()
 # multi-page test
 print("\n=== PDF PROCESSING ===")
 pdf_input_data = [{
-    "file_path": f"{settings.ROOT_DIR}/submodules/sparrow/sparrow-data/parse/sparrow_parse/images/20240101_Services Agreement_ExcelSports.pdf",  # Replace with your PDF path
+    "file_path": f"{django_settings.ROOT_DIR}/submodules/sparrow/sparrow-data/parse/sparrow_parse/images/20240101_Services Agreement_ExcelSports.pdf",  # Replace with your PDF path
     "text_input": "Extract major clause summaries from this agreement. Return the data in JSON format with fields: intellectual_property, retainer_fee, confidentiality, non_disparagement, termination, indemnification, assignment, warranties, liability, arbitration, choice_of_law, and miscellaneous. If information is not present, return null for that field."
 }]
 
