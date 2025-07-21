@@ -55,6 +55,7 @@ boto3
 aiobotocore==2.13.1
 opencv-python==4.8.1.78
 
+awscli
 
 # Force reinstall:
 # pip install --force-reinstall -r requirements.txt
