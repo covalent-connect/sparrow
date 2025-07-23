@@ -19,7 +19,11 @@ if betterbrain_settings_path not in sys.path:
 
 import betterbrain.betterbrain.settings as sparrow_settings
 from eval_utils import init_django
-import scripts.aws.spot.aws_entrypoint as aws_entrypoint
+
+try:
+    import scripts.aws.spot.aws_entrypoint as aws_entrypoint
+except:
+    pass
 
 
 
