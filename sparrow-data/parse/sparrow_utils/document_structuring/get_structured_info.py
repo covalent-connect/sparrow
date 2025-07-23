@@ -21,6 +21,9 @@ from sparrow_parse.vllm.utils.combine_answers import combine_json_results
 import os
 import pprint
 
+from utils.general.files.download.s3 import download_file
+
+
 def get_structured_info_from_file(
     file_id: int
 ):
@@ -28,6 +31,8 @@ def get_structured_info_from_file(
 
     # if file.type != FileType.PDF:
     #     raise ValueError(f"File {file_id} is not a PDF")
+
+    file_bytes = download_file(file=file)
 
     # Initialize extractor
     extractor = VLLMExtractor()
@@ -44,6 +49,17 @@ def get_structured_info_from_file(
     # Create inference instance
     factory = InferenceFactory(config)
     model_inference_instance = factory.get_inference_instance()
+
+    pdf_input_data = [{
+        "file_bytes": file_bytes,
+        "text_input": "Extract key fields from this invoice: invoice_number, invoice_date, invoice_amount, invoice_due_date, recipient, sender"
+    }]
+
+    pdf_results, pdf_num_pages = extractor.run_inference(
+        model_inference_instance, 
+        pdf_input_data,
+        debug=True
+    )
 
     final_dict = {
         'clause1': 'clause1',
@@ -79,6 +95,6 @@ def get_structured_info_from_file(
     # pprint.pprint(final_result)
 
 if __name__ == "__main__":
-    get_structured_info_from_file(4611)
+    get_structured_info_from_file(77076)
 
 # python -m sparrow_utils.document_structuring.get_structured_info

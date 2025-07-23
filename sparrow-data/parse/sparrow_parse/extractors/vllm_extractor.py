@@ -7,6 +7,8 @@ from rich import print
 import os
 import tempfile
 import shutil
+import io
+from typing import Union
 
 
 class VLLMExtractor(object):
@@ -18,10 +20,11 @@ class VLLMExtractor(object):
         """
         Main entry point for processing input data using a model inference instance.
         Handles generic queries, PDFs, and table extraction.
+        Supports file_path as a filename, bytes, or BytesIO.
         """
         if generic_query:
             input_data[0]["text_input"] = "retrieve document data. return response in JSON format"
-            apply_annotation=False
+            apply_annotation = False
 
         if debug:
             print("Input data:", input_data)
@@ -35,21 +38,66 @@ class VLLMExtractor(object):
             results = model_inference_instance.inference(input_data)
             return results, 0
 
-        # Document data extraction inference (file_path exists and is not None)
-        file_path = input_data[0]["file_path"]
-        if self.is_pdf(file_path):
-            return self._process_pdf(model_inference_instance, input_data, tables_only, crop_size, apply_annotation, debug, debug_dir, mode)
+        # Support file_path as filename, bytes, or BytesIO
+        file_path_obj = input_data[0]["file_path"]
+        file_path, temp_file = self._ensure_file_on_disk(file_path_obj, suffix=self._guess_file_suffix(file_path_obj))
+        try:
+            if self.is_pdf(file_path):
+                return self._process_pdf(model_inference_instance, input_data, tables_only, crop_size, apply_annotation, debug, debug_dir, mode, file_path=file_path)
+            else:
+                return self._process_non_pdf(model_inference_instance, input_data, tables_only, crop_size, apply_annotation, debug, debug_dir, file_path=file_path)
+        finally:
+            if temp_file is not None:
+                try:
+                    os.remove(temp_file)
+                except Exception:
+                    pass
+
+    def _ensure_file_on_disk(self, file_path_obj: Union[str, bytes, io.BytesIO], suffix=None):
+        """
+        Ensures that the input is a file path on disk.
+        If file_path_obj is a string (filename), returns it directly.
+        If it's bytes or BytesIO, writes to a temp file and returns the path.
+        Returns (file_path, temp_file_path or None)
+        """
+        if isinstance(file_path_obj, str):
+            return file_path_obj, None
+        elif isinstance(file_path_obj, bytes):
+            temp_fd, temp_path = tempfile.mkstemp(suffix=suffix or "")
+            with os.fdopen(temp_fd, "wb") as f:
+                f.write(file_path_obj)
+            return temp_path, temp_path
+        elif isinstance(file_path_obj, io.BytesIO):
+            temp_fd, temp_path = tempfile.mkstemp(suffix=suffix or "")
+            with os.fdopen(temp_fd, "wb") as f:
+                f.write(file_path_obj.getvalue())
+            return temp_path, temp_path
         else:
-            return self._process_non_pdf(model_inference_instance, input_data, tables_only, crop_size, apply_annotation, debug, debug_dir)
+            raise ValueError("file_path must be a filename, bytes, or BytesIO object")
 
+    def _guess_file_suffix(self, file_path_obj):
+        """
+        Guess the file suffix for temp file creation.
+        """
+        if isinstance(file_path_obj, str):
+            _, ext = os.path.splitext(file_path_obj)
+            return ext
+        # If bytes or BytesIO, default to .pdf (could be improved)
+        return ".pdf"
 
-    def _process_pdf(self, model_inference_instance, input_data, tables_only, crop_size, apply_annotation, debug, debug_dir, mode):
+    def _process_pdf(self, model_inference_instance, input_data, tables_only, crop_size, apply_annotation, debug, debug_dir, mode, file_path=None):
         """
         Handles processing and inference for PDF files, including page splitting and optional table extraction.
+        Accepts file_path as a filename.
         """
         pdf_optimizer = PDFOptimizer()
-        num_pages, output_files, temp_dir = pdf_optimizer.split_pdf_to_pages(input_data[0]["file_path"],
-                                                                             debug_dir, convert_to_images=True)
+        num_pages, output_files, temp_dir = pdf_optimizer.split_pdf_to_pages(
+            file_path or input_data[0]["file_path"],
+            debug_dir, convert_to_images=True
+        )
+
+        # Update input_data[0]["file_path"] to the file_path used
+        input_data[0]["file_path"] = file_path or input_data[0]["file_path"]
 
         results = self._process_pages(model_inference_instance, output_files, input_data, tables_only, crop_size, apply_annotation, debug, debug_dir)
 
@@ -57,12 +105,12 @@ class VLLMExtractor(object):
         shutil.rmtree(temp_dir, ignore_errors=True)
         return results, num_pages
 
-
-    def _process_non_pdf(self, model_inference_instance, input_data, tables_only, crop_size, apply_annotation, debug, debug_dir):
+    def _process_non_pdf(self, model_inference_instance, input_data, tables_only, crop_size, apply_annotation, debug, debug_dir, file_path=None):
         """
         Handles processing and inference for non-PDF files, with optional table extraction.
+        Accepts file_path as a filename.
         """
-        file_path = input_data[0]["file_path"]
+        file_path = file_path or input_data[0]["file_path"]
 
         if tables_only:
             return self._extract_tables(model_inference_instance, file_path, input_data, apply_annotation, debug, debug_dir), 1
@@ -75,8 +123,8 @@ class VLLMExtractor(object):
                 image_optimizer = ImageOptimizer()
                 cropped_file_path = image_optimizer.crop_image_borders(file_path, temp_dir, debug_dir, crop_size)
                 input_data[0]["file_path"] = cropped_file_path
+                file_path = cropped_file_path
 
-            file_path = input_data[0]["file_path"]
             input_data[0]["file_path"] = [file_path]
             results = model_inference_instance.inference(input_data, apply_annotation)
 
@@ -108,7 +156,7 @@ class VLLMExtractor(object):
                 print(f"Processing {len(output_files)} pages for table extraction.")
             # Process each page individually for table extraction
             for i, file_path in enumerate(output_files):
-                tables_result = self._extract_tables( model_inference_instance, file_path, input_data, apply_annotation, debug, debug_dir, page_index=i)
+                tables_result = self._extract_tables(model_inference_instance, file_path, input_data, apply_annotation, debug, debug_dir, page_index=i)
                 # Since _extract_tables returns a list with one JSON string, unpack it
                 results_array.extend(tables_result)  # Unpack the single JSON string
         else:
@@ -149,7 +197,6 @@ class VLLMExtractor(object):
 
         return results_array
 
-
     def _extract_tables(self, model_inference_instance, file_path, input_data, apply_annotation, debug, debug_dir, page_index=None):
         """
         Detects and processes tables from an input file.
@@ -189,7 +236,6 @@ class VLLMExtractor(object):
         # Return the formatted JSON string wrapped in a list
         return [formatted_results]
 
-
     @staticmethod
     def _run_model_inference(model_inference_instance, input_data, apply_annotation):
         """
@@ -201,10 +247,12 @@ class VLLMExtractor(object):
         except json.JSONDecodeError:
             return {"message": "Invalid JSON format in LLM output", "valid": "false"}
 
-
     @staticmethod
     def is_pdf(file_path):
         """Checks if a file is a PDF based on its extension."""
+        if not isinstance(file_path, str):
+            # If file_path is not a string, we can't check extension, assume PDF for bytes/BytesIO
+            return True
         return file_path.lower().endswith('.pdf')
 
 
@@ -253,4 +301,3 @@ if __name__ == "__main__":
     # for i, result in enumerate(results_array):
     #     print(f"Result for page {i + 1}:", result)
     # print(f"Number of pages: {num_pages}")
-
