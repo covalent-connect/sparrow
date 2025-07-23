@@ -13,6 +13,7 @@ from utils.integrations.slack.send_message import send_slack_message
 
 
 import json
+
 from sparrow_parse.vllm.inference_factory import InferenceFactory
 from sparrow_parse.vllm.openai_inference import OpenAIInference
 from sparrow_parse.extractors.vllm_extractor import VLLMExtractor
