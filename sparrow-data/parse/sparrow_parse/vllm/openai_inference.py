@@ -4,6 +4,7 @@ import json
 import os
 from sparrow_parse.vllm.inference_base import ModelInference
 from rich import print
+import pprint
 
 
 class OpenAIInference(ModelInference):
@@ -97,13 +98,15 @@ class OpenAIInference(ModelInference):
             return [self.get_simple_json()]
 
         # Determine if we're doing text-only or image-based inference
-        is_text_only = input_data[0].get("file_path") is None
+        is_text_only = input_data[0]["is_text_only"]
         
         if is_text_only:
             # Text-only inference
             messages = [{"role": "user", "content": input_data[0]["text_input"]}]
             response = self._generate_text_response(messages)
             results = [response]
+            print(f"Text inference completed successfully")
+            pprint.pprint(results)
         else:
             # Image-based inference
             file_paths = self._extract_file_paths(input_data)

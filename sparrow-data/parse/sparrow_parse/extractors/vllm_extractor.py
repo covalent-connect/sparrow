@@ -1,14 +1,21 @@
 import json
+from betterbrain.sql.models.files.file import FileType
 from sparrow_parse.vllm.inference_factory import InferenceFactory
 from sparrow_parse.helpers.pdf_optimizer import PDFOptimizer
 from sparrow_parse.helpers.image_optimizer import ImageOptimizer
 from sparrow_parse.processors.table_structure_processor import TableDetector
+from sparrow_parse.vllm.utils.data_type import DataType
+
+
 from rich import print
 import os
 import tempfile
 import shutil
 import io
-from typing import Union
+from typing import Union, 
+from typing import List, Dict, Tuple
+
+from utils.embedding.indexing.utils.is_image import is_file_type_image
 
 
 class VLLMExtractor(object):
@@ -16,7 +23,7 @@ class VLLMExtractor(object):
         pass
 
     def run_inference(self, model_inference_instance, input_data, tables_only=False,
-                      generic_query=False, crop_size=None, apply_annotation=False, debug_dir=None, debug=False, mode=None):
+                      generic_query=False, crop_size=None, apply_annotation=False, debug_dir=None, debug=False, mode=None) -> Tuple[List[Dict], int]:
         """
         Main entry point for processing input data using a model inference instance.
         Handles generic queries, PDFs, and table extraction.
@@ -30,7 +37,9 @@ class VLLMExtractor(object):
             print("Input data:", input_data)
 
         # Handle both missing file_path and file_path=None as text-only inference
-        is_text_only = "file_path" not in input_data[0] or input_data[0]["file_path"] is None
+        # is_text_only = "file_path" not in input_data[0] or input_data[0]["file_path"] is None
+
+        is_text_only = input_data[0]["is_text_only"]
 
         if is_text_only:
             # Ensure file_path exists and is None for consistency
@@ -39,19 +48,86 @@ class VLLMExtractor(object):
             return results, 0
 
         # Support file_path as filename, bytes, or BytesIO
-        file_path_obj = input_data[0]["file_path"]
-        file_path, temp_file = self._ensure_file_on_disk(file_path_obj, suffix=self._guess_file_suffix(file_path_obj))
-        try:
-            if self.is_pdf(file_path):
-                return self._process_pdf(model_inference_instance, input_data, tables_only, crop_size, apply_annotation, debug, debug_dir, mode, file_path=file_path)
+        file_type = input_data[0]["file_type"]
+        data_type = input_data[0]["data_type"]
+
+        print(f"File type: {file_type}")
+        print(f"Data type: {data_type}")
+
+        tmp_path_on_disk = None
+        if data_type == DataType.FILE_PATH:
+            # load the file and turn it into bytes object
+            file_path = input_data[0]["content"]
+        elif data_type == DataType.FILE_BYTES:
+            if isinstance(file_type, str):
+                suffix = f'.{file_type.lower()}'
             else:
-                return self._process_non_pdf(model_inference_instance, input_data, tables_only, crop_size, apply_annotation, debug, debug_dir, file_path=file_path)
+                suffix = f'.{file_type.value.lower()}'
+            tmp_path, tmp_path_on_disk = self._ensure_file_on_disk(
+                input_data[0]["content"], 
+                suffix=suffix
+            )
+            file_path = tmp_path_on_disk
+        elif data_type == DataType.TEXT_INPUT:
+            pass
+        else:
+            raise ValueError(f"Invalid data type: {data_type}")
+
+        input_data[0]["file_path"] = file_path
+
+        try:
+            if is_file_type_image(file_type):
+                print(f"Is image")
+                return self._process_non_pdf(
+                    model_inference_instance, 
+                    input_data, 
+                    tables_only, 
+                    crop_size, 
+                    apply_annotation, 
+                    debug, 
+                    debug_dir, 
+                    file_path=file_path
+                )
+            elif file_type == FileType.PDF:
+                print(f"Is PDF")
+                return self._process_pdf(
+                    model_inference_instance, 
+                    input_data, 
+                    tables_only, 
+                    crop_size, 
+                    apply_annotation, 
+                    debug, 
+                    debug_dir, 
+                    mode, 
+                    file_path=file_path
+                )
+            # TODO: Handle docx, doc, txt, any other file types we need to
         finally:
-            if temp_file is not None:
+            if tmp_path_on_disk is not None:
                 try:
-                    os.remove(temp_file)
+                    os.remove(tmp_path_on_disk)
                 except Exception:
                     pass
+
+
+        # if data_type == DataType.FILE_PATH:
+        #     file_path_obj = input_data[0]["file_path"]
+        # elif data_type == DataType.FILE_BYTES:
+        #     file_path_obj = input_data[0]["content"]
+        # else:
+        #     raise ValueError(f"Invalid data type: {data_type}")
+        # file_path, temp_file = self._ensure_file_on_disk(file_path_obj, suffix=self._guess_file_suffix(file_path_obj))
+        # try:
+        #     if self.is_pdf(file_path):
+        #         return self._process_pdf(model_inference_instance, input_data, tables_only, crop_size, apply_annotation, debug, debug_dir, mode, file_path=file_path)
+        #     else:
+        #         return self._process_non_pdf(model_inference_instance, input_data, tables_only, crop_size, apply_annotation, debug, debug_dir, file_path=file_path)
+        # finally:
+        #     if temp_file is not None:
+        #         try:
+        #             os.remove(temp_file)
+        #         except Exception:
+        #             pass
 
     def _ensure_file_on_disk(self, file_path_obj: Union[str, bytes, io.BytesIO], suffix=None):
         """

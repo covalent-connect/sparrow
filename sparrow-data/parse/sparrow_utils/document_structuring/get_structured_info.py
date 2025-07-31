@@ -1,4 +1,4 @@
-
+from typing import List, Dict, Any
 
 from settings import sparrow_settings as django_settings
 from settings import *
@@ -18,16 +18,28 @@ from sparrow_parse.vllm.inference_factory import InferenceFactory
 from sparrow_parse.vllm.openai_inference import OpenAIInference
 from sparrow_parse.extractors.vllm_extractor import VLLMExtractor
 from sparrow_parse.vllm.utils.combine_answers import combine_json_results
+from sparrow_parse.vllm.utils.data_type import DataType
 
 import os
 import pprint
 
 from utils.general.files.download.s3 import download_file
 
+from enum import Enum
+
+import requests
+
 
 def get_structured_info_from_file(
-    file_id: int
+    file_id: int,
+    fields: List[str],
+    webhook_info: Dict[str, Any]
 ):
+    """
+    webhook_info is a dict with the following keys:
+    - url: str
+    - params: Dict[str, Any]
+    """
     file = File.objects.get(id=file_id)
 
     # if file.type != FileType.PDF:
@@ -48,33 +60,55 @@ def get_structured_info_from_file(
     }
 
     # Create inference instance
-    factory = InferenceFactory(config)
+    factory = InferenceFactory(config, fields=fields)
     model_inference_instance = factory.get_inference_instance()
 
-    pdf_input_data = [{
-        "file_bytes": file_bytes,
+    input_data = [{
+        'is_text_only': False,
+        'file_type': file.type,
+        'data_type': DataType.FILE_BYTES,
+        "content": file_bytes,
         "text_input": "Extract key fields from this invoice: invoice_number, invoice_date, invoice_amount, invoice_due_date, recipient, sender"
     }]
 
     pdf_results, pdf_num_pages = extractor.run_inference(
         model_inference_instance, 
-        pdf_input_data,
+        input_data,
         debug=True
     )
 
-    final_dict = {
-        'clause1': 'clause1',
-        'clause2': 'clause2',
-        'clause3': 'clause3',
-        'clause4': 'clause4',
-        'clause5': 'clause5',
-        'clause6': 'clause6',
-        'clause7': 'clause7',
-    }
+    # print(f"PDF Results:")
+    # pprint.pprint(pdf_results)
 
-    send_slack_message(f"Final dict: {final_dict}")
+    # final_dict = {
+    #     'clause1': 'clause1',
+    #     'clause2': 'clause2',
+    #     'clause3': 'clause3',
+    #     'clause4': 'clause4',
+    #     'clause5': 'clause5',
+    #     'clause6': 'clause6',
+    #     'clause7': 'clause7',
+    # }
 
-    return final_dict
+    final_result = combine_json_results(pdf_results)
+    pprint.pprint(final_result)
+    send_slack_message(f"Final dict: {final_result}")
+
+    if webhook_info is not None:
+        # make a post request to the webhook
+        payload = {
+            'result': {
+                'file_id': file_id,
+                'fields': fields,
+                'extracted_data': final_result
+            },
+            **webhook_info.get('params', {})
+        }
+
+        response = requests.post(webhook_info['url'], json=payload)
+        print(f"Webhook response: {response.text}")
+
+    return final_result
 
     # # multi-page test
     # print("\n=== PDF PROCESSING ===")
@@ -96,6 +130,9 @@ def get_structured_info_from_file(
     # pprint.pprint(final_result)
 
 if __name__ == "__main__":
-    get_structured_info_from_file(77076)
+    get_structured_info_from_file(
+        file_id=4744,
+        fields=['Invoice Number', 'Invoice Date', 'Invoice Amount', 'Invoice Due Date', 'Recipient', 'Sender']
+    )
 
 # python -m sparrow_utils.document_structuring.get_structured_info

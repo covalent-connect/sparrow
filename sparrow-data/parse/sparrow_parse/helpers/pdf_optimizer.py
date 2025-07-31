@@ -9,11 +9,16 @@ class PDFOptimizer(object):
     def __init__(self):
         pass
 
-    def split_pdf_to_pages(self, file_path, debug_dir=None, convert_to_images=False):
+    def split_pdf_to_pages(
+        self, 
+        file_path,
+        debug_dir=None, 
+        convert_to_images=False
+    ):
         # Create a temporary directory
         temp_dir = tempfile.mkdtemp()
         output_files = []
-
+                
         if not convert_to_images:
             # Open the PDF file
             with open(file_path, 'rb') as pdf_file:
