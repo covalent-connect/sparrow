@@ -102,7 +102,9 @@ def get_structured_info_from_file(
                 'fields': fields,
                 'extracted_data': final_result
             },
-            **webhook_info.get('params', {})
+            'pass_through_params': {
+                **webhook_info.get('params', {})
+            },
         }
 
         response = requests.post(webhook_info['url'], json=payload)
@@ -132,7 +134,15 @@ def get_structured_info_from_file(
 if __name__ == "__main__":
     get_structured_info_from_file(
         file_id=4744,
-        fields=['Invoice Number', 'Invoice Date', 'Invoice Amount', 'Invoice Due Date', 'Recipient', 'Sender']
+        fields=['Invoice Number', 'Invoice Date', 'Invoice Amount', 'Invoice Due Date', 'Recipient', 'Sender'],
+        webhook_info={
+            'url': "https://api.betterbrainai.com.ngrok.io/api/v1/sparrow/webhook/",
+            'params': {
+                'organization_id': 1,
+                'user_id': 1,
+                'cell_id': 2
+            }
+        }
     )
 
 # python -m sparrow_utils.document_structuring.get_structured_info

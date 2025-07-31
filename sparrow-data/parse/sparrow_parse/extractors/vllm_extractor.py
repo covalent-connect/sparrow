@@ -12,7 +12,7 @@ import os
 import tempfile
 import shutil
 import io
-from typing import Union, 
+from typing import Union 
 from typing import List, Dict, Tuple
 
 from utils.embedding.indexing.utils.is_image import is_file_type_image
