@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from settings import sparrow_settings as django_settings
 from settings import *
@@ -32,7 +32,9 @@ import requests
 
 def get_structured_info_from_file(
     file_id: int,
-    fields: List[str],
+    text_input: str,
+    fields: Optional[List[str]],
+    schema: Optional[Dict[str, Any]],
     webhook_info: Dict[str, Any]
 ):
     """
@@ -60,7 +62,7 @@ def get_structured_info_from_file(
     }
 
     # Create inference instance
-    factory = InferenceFactory(config, fields=fields)
+    factory = InferenceFactory(config, fields=fields, schema=schema)
     model_inference_instance = factory.get_inference_instance()
 
     input_data = [{
@@ -68,7 +70,8 @@ def get_structured_info_from_file(
         'file_type': file.type,
         'data_type': DataType.FILE_BYTES,
         "content": file_bytes,
-        "text_input": "Extract key fields from this invoice: invoice_number, invoice_date, invoice_amount, invoice_due_date, recipient, sender"
+        'text_input': text_input,
+        # "text_input": "Extract key fields from this invoice: invoice_number, invoice_date, invoice_amount, invoice_due_date, recipient, sender"
     }]
 
     pdf_results, pdf_num_pages = extractor.run_inference(
@@ -132,8 +135,20 @@ def get_structured_info_from_file(
     # pprint.pprint(final_result)
 
 if __name__ == "__main__":
+    # get_structured_info_from_file(
+    #     file_id=4744,
+    #     fields=['Invoice Number', 'Invoice Date', 'Invoice Amount', 'Invoice Due Date', 'Recipient', 'Sender'],
+    #     webhook_info={
+    #         'url': "https://api.betterbrainai.com.ngrok.io/api/v1/sparrow/webhook/",
+    #         'params': {
+    #             'organization_id': 1,
+    #             'user_id': 1,
+    #             'cell_id': 2
+    #         }
+    #     }
+    # )
     get_structured_info_from_file(
-        file_id=4744,
+        file_id=4611,
         fields=['Invoice Number', 'Invoice Date', 'Invoice Amount', 'Invoice Due Date', 'Recipient', 'Sender'],
         webhook_info={
             'url': "https://api.betterbrainai.com.ngrok.io/api/v1/sparrow/webhook/",

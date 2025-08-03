@@ -5,9 +5,10 @@ from sparrow_parse.vllm.openai_inference import OpenAIInference
 
 
 class InferenceFactory:
-    def __init__(self, config, fields=None):
+    def __init__(self, config, fields=None, schema=None):
         self.config = config
         self.fields = fields
+        self.schema = schema
 
     def get_inference_instance(self):
         if self.config["method"] == "huggingface":
@@ -23,7 +24,8 @@ class InferenceFactory:
                 model_name=self.config.get("model_name", "gpt-4o"),
                 max_tokens=self.config.get("max_tokens", 4000),
                 temperature=self.config.get("temperature", 0.0),
-                fields=self.fields
+                fields=self.fields,
+                schema=self.schema
             )
         else:
             raise ValueError(f"Unknown method: {self.config['method']}")

@@ -13,7 +13,7 @@ class OpenAIInference(ModelInference):
     Handles image preprocessing, response formatting, and model interaction.
     """
 
-    def __init__(self, api_key=None, model_name="gpt-4o", max_tokens=4000, temperature=0.0, fields=None):
+    def __init__(self, api_key=None, model_name="gpt-4o", max_tokens=4000, temperature=0.0, fields=None, schema=None):
         """
         Initialize the inference class with OpenAI configuration.
 
@@ -29,7 +29,8 @@ class OpenAIInference(ModelInference):
         self.model_name = model_name
         self.max_tokens = max_tokens
         self.temperature = temperature
-        self.fields = fields
+        self.fields = fields    
+        self.schema = schema
         
         # Initialize OpenAI client
         openai.api_key = self.api_key
@@ -178,6 +179,16 @@ class OpenAIInference(ModelInference):
 
                 # Generate response
                 client = openai.OpenAI(api_key=self.api_key) if hasattr(self, "api_key") and self.api_key else openai.OpenAI()
+
+                schema_obj = {
+                    "type": "object",
+                    "properties": {field: {"type": "string"} for field in self.fields} if hasattr(self, "fields") and self.fields else {},
+                    "required": list(self.fields) if hasattr(self, "fields") and self.fields else [],
+                    "additionalProperties": False
+                }
+                if self.schema is not None:
+                    schema_obj = self.schema
+
                 response = client.chat.completions.create(
                     model=self.model_name,
                     messages=messages,
@@ -187,12 +198,7 @@ class OpenAIInference(ModelInference):
                         "type": "json_schema",
                         "json_schema": {
                             "name": "summary",
-                            "schema": {
-                                "type": "object",
-                                "properties": {field: {"type": "string"} for field in self.fields} if hasattr(self, "fields") and self.fields else {},
-                                "required": list(self.fields) if hasattr(self, "fields") and self.fields else [],
-                                "additionalProperties": False
-                            }
+                            "schema": schema_obj
                         }
                     }
                 )
