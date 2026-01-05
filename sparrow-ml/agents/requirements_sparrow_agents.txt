@@ -3,7 +3,7 @@ rich
 typer[all]
 fastapi==0.115.9
 uvicorn[standard]
-aiohttp==3.11.13
+aiohttp==3.13.3
 prefect==3.2.7
 numpy==2.2.3
 pypdf==5.3.0
